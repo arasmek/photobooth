@@ -1,2 +1,7 @@
 order deny,allow
 deny from all
+
+# The chroma keying page loads Seriously.js from vendor/Seriously.
+<FilesMatch "^seriously(\.chroma)?\.js$">
+    allow from all
+</FilesMatch>

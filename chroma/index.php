@@ -48,7 +48,7 @@ include PathUtility::getAbsolutePath('template/components/main.head.php');
     </div>
 </div>
 <?php include PathUtility::getAbsolutePath('template/components/stage.loader.php'); ?>
-<div class="stage stage--result" data-stage="result">
+<div class="stage stage--result stage--chroma-result" data-stage="result">
     <div class="stage-inner">
         <div class="buttonbar buttonbar--bottom">
             <?= ComponentUtility::renderButton('reload', $config['icons']['refresh'], 'reload') ?>
@@ -69,7 +69,8 @@ include PathUtility::getAbsolutePath('template/components/main.head.php');
 
 <script src="<?=$assetService->getUrl('resources/js/preview.js')?>"></script>
 <script src="<?=$assetService->getUrl('resources/js/virtualKeyboard.js')?>"></script>
-    <script src="<?=$assetService->getUrl('resources/js/core.js')?>"></script>
+<script src="<?=$assetService->getUrl('resources/js/screensaver.js')?>"></script>
+<script src="<?=$assetService->getUrl('resources/js/core.js')?>"></script>
 
 <?php ProcessService::getInstance()->boot(); ?>
 </body>

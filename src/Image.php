@@ -448,6 +448,14 @@ class Image
                     $resource = @imagecreatefromstring((string)$contents);
                     break;
             }
+            // The extension can lie, e.g. chroma capture saves PNG canvas data
+            // to a .jpg file. Let GD detect the real format from the content.
+            if (!$resource && is_file($image)) {
+                $contents = file_get_contents($image);
+                if ($contents !== false) {
+                    $resource = @imagecreatefromstring($contents);
+                }
+            }
             if (!$resource) {
                 throw new \Exception('Can\'t create GD resource.');
             }

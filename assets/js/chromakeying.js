@@ -58,6 +58,34 @@ function alphaBoundary(imageOut, radius) {
     }
 }
 
+// Apply the configured Seriously.js chroma settings. Shared by the still image
+// keying and the live preview so both look the same.
+function applyChromaSettings(effect) {
+    const color = config.keying.seriouslyjs_color;
+    const r = parseInt(color.substr(1, 2), 16) / 255;
+    const g = parseInt(color.substr(3, 2), 16) / 255;
+    const b = parseInt(color.substr(5, 2), 16) / 255;
+    photoboothTools.console.logDev('Chromakeying color:', color);
+    effect.screen = [r, g, b, 1];
+
+    const numberSetting = (key, fallback) => {
+        const value = parseFloat(config.keying[key]);
+        return isNaN(value) ? fallback : value;
+    };
+    effect.weight = numberSetting('seriouslyjs_weight', 1);
+    effect.balance = numberSetting('seriouslyjs_balance', 1);
+    effect.clipBlack = numberSetting('seriouslyjs_clip_black', 0);
+    effect.clipWhite = numberSetting('seriouslyjs_clip_white', 1);
+}
+
+// Draw an image so it covers the whole target area, cropping from the center.
+function drawImageCover(ctx, img, width, height) {
+    const scale = Math.max(width / img.width, height / img.height);
+    const w = img.width * scale;
+    const h = img.height * scale;
+    ctx.drawImage(img, (width - w) / 2, (height - h) / 2, w, h);
+}
+
 function processChromaImage(imgSrc, save = false, filename = '') {
     if (config.keying.variant === 'marvinj') {
         const image = new MarvinImage();
@@ -111,13 +139,7 @@ function processChromaImage(imgSrc, save = false, filename = '') {
             chroma = seriously.effect('chroma');
             chroma.source = seriouslyimage;
             target.source = chroma;
-            const color = config.keying.seriouslyjs_color;
-            const r = parseInt(color.substr(1, 2), 16) / 255;
-            const g = parseInt(color.substr(3, 2), 16) / 255;
-            const b = parseInt(color.substr(5, 2), 16) / 255;
-            photoboothTools.console.logDev('Chromakeying color:', color);
-            photoboothTools.console.logDev('Red:', r, 'Green:', g, 'Blue:', b);
-            chroma.screen = [r, g, b, 1];
+            applyChromaSettings(chroma);
             seriously.go();
             mainImage = new Image();
             mainImage.src = tmpCanvas.toDataURL('image/png');
@@ -153,13 +175,9 @@ function drawCanvas(save = false, filename = '') {
 
     if (typeof backgroundImage !== 'undefined' && backgroundImage !== null) {
         if (typeof mainImage !== 'undefined' && mainImage !== null) {
-            const size = calculateAspectRatioFit(
-                backgroundImage.width,
-                backgroundImage.height,
-                mainImage.width,
-                mainImage.height
-            );
-            chromaCanvasContext.drawImage(backgroundImage, 0, 0, size.width, size.height);
+            // Cover the whole photo (same as the live preview) instead of
+            // leaving uncovered areas when the aspect ratios differ.
+            drawImageCover(chromaCanvasContext, backgroundImage, mainImage.width, mainImage.height);
         } else {
             chromaCanvasContext.drawImage(backgroundImage, 0, 0, backgroundImage.width, backgroundImage.height);
         }
@@ -281,14 +299,148 @@ function saveImage(filename, cb) {
     });
 }
 
-function calculateAspectRatioFit(srcWidth, srcHeight, maxWidth, maxHeight) {
-    const ratio = Math.max(maxWidth / srcWidth, maxHeight / srcHeight);
+/*
+ * Live keyed preview for the chroma capture page.
+ *
+ * The device cam <video> is keyed with Seriously.js (WebGL) and drawn on top of
+ * the selected background into a canvas that sits exactly where the video is.
+ * The video itself is made invisible but keeps playing, so core.js can still
+ * show/hide it and grab the photo from it as before.
+ */
+const chromaLivePreview = (function () {
+    const api = {};
+    const video = document.getElementById('preview--video');
+    let liveCanvas = null;
+    let liveContext = null;
+    let glCanvas = null;
+    let liveSeriously = null;
+    let liveTarget = null;
+    let running = false;
 
-    return {
-        width: srcWidth * ratio,
-        height: srcHeight * ratio
+    api.isSupported = function () {
+        return (
+            typeof onCaptureChromaView !== 'undefined' &&
+            config.keying.live_preview &&
+            config.keying.variant === 'seriouslyjs' &&
+            config.preview.mode === 'device_cam' &&
+            typeof Seriously !== 'undefined' &&
+            video !== null
+        );
     };
-}
+
+    function setup() {
+        glCanvas = document.createElement('canvas');
+        liveCanvas = document.createElement('canvas');
+        liveCanvas.id = 'preview--chroma';
+        liveContext = liveCanvas.getContext('2d');
+        video.after(liveCanvas);
+
+        liveSeriously = new Seriously();
+        const source = liveSeriously.source(video);
+        const effect = liveSeriously.effect('chroma');
+        applyChromaSettings(effect);
+        effect.source = source;
+        liveTarget = liveSeriously.target(glCanvas);
+        liveTarget.source = effect;
+    }
+
+    // Place the canvas where the video is rendered (same box, fit and rotation),
+    // but without the flip classes: only the person gets mirrored, not the background.
+    function syncLayout() {
+        const style = window.getComputedStyle(video);
+        [
+            'position',
+            'top',
+            'left',
+            'right',
+            'bottom',
+            'width',
+            'height',
+            'maxWidth',
+            'maxHeight',
+            'objectFit',
+            'rotate',
+            'translate',
+            'aspectRatio'
+        ].forEach((prop) => {
+            liveCanvas.style[prop] = style[prop];
+        });
+        liveCanvas.style.display = 'block';
+    }
+
+    function isActive() {
+        return (
+            typeof backgroundImage !== 'undefined' &&
+            backgroundImage !== null &&
+            backgroundImage.complete &&
+            backgroundImage.naturalWidth > 0 &&
+            video.srcObject &&
+            video.videoWidth > 0 &&
+            $(video).is(':visible')
+        );
+    }
+
+    function drawFrame() {
+        const width = video.videoWidth;
+        const height = video.videoHeight;
+        if (liveCanvas.width !== width || liveCanvas.height !== height) {
+            liveCanvas.width = glCanvas.width = width;
+            liveCanvas.height = glCanvas.height = height;
+            liveTarget.width = width;
+            liveTarget.height = height;
+        }
+
+        liveContext.setTransform(1, 0, 0, 1, 0, 0);
+        drawImageCover(liveContext, backgroundImage, width, height);
+
+        const flip = config.preview.flip;
+        const flipX = flip === 'flip-horizontal' || flip === 'flip-both' ? -1 : 1;
+        const flipY = flip === 'flip-vertical' || flip === 'flip-both' ? -1 : 1;
+        liveContext.setTransform(flipX, 0, 0, flipY, flipX < 0 ? width : 0, flipY < 0 ? height : 0);
+        liveContext.drawImage(glCanvas, 0, 0, width, height);
+    }
+
+    function tick() {
+        if (isActive()) {
+            if (!running) {
+                running = true;
+                liveSeriously.go();
+                syncLayout();
+                // keep the video playing (it is the keying source and the
+                // capture source), but only show the keyed canvas
+                video.style.opacity = '0';
+            }
+            drawFrame();
+        } else if (running) {
+            running = false;
+            liveSeriously.stop();
+            video.style.opacity = '';
+            liveCanvas.style.display = 'none';
+        }
+        window.requestAnimationFrame(tick);
+    }
+
+    api.init = function () {
+        if (!api.isSupported()) {
+            return;
+        }
+        try {
+            setup();
+        } catch (error) {
+            photoboothTools.console.log('ERROR: Chroma live preview not available:', error);
+            return;
+        }
+        photoboothTools.console.logDev('Chroma live preview initialized.');
+        window.addEventListener('resize', () => {
+            if (running) {
+                syncLayout();
+            }
+        });
+        window.requestAnimationFrame(tick);
+    };
+
+    return api;
+})();
 
 $(document).on('keyup', function (ev) {
     if (
@@ -382,6 +534,8 @@ $(function () {
             }
             photoBooth.thrill('chroma');
         });
+
+        chromaLivePreview.init();
 
         photoboothTools.console.log('[CHROMA CAPTURE] DOM ready');
     }

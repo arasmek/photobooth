@@ -18,6 +18,12 @@
   }
 }
 
+// The keyed photo is drawn into #chromaCanvas behind the stages,
+// so the result stage must not paint its own background over it.
+.stage.stage--chroma-result {
+  background: transparent;
+}
+
 .chroma-background-selector {
   position: absolute;
   max-width: 100%;
