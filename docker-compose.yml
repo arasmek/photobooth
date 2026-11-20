@@ -3,8 +3,24 @@ version: "3.9"
 services:
   photobooth:
     build: .
+    # The image ends with `USER application` for the build steps, but the
+    # webdevops entrypoint needs root to start (it drops privileges itself).
+    # Without this the container fails on every start after the first one.
+    user: root
     ports:
       - "80:80"
       - "443:443"
     environment:
       - COMPOSER_VERSION=2
+    volumes:
+      # Backgrounds come live from the checkout: edit the folder, reload the page.
+      - ./resources/img/background:/app/resources/img/background:ro
+      # Print hot folder for testing: set Admin > Print > "Print hot folder" to /hotfolder
+      - ./print-hotfolder:/hotfolder
+      # Keep admin settings and taken photos when the container is rebuilt.
+      - photobooth-config:/app/config
+      - photobooth-data:/app/data
+
+volumes:
+  photobooth-config:
+  photobooth-data:

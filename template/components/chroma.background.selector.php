@@ -11,6 +11,8 @@ try {
 } catch (\Exception $e) {
     // If no backgrounds are available, render nothing and keep UI usable.
 }
+// Predictable order (01, 02, ...) for cycling through backgrounds.
+natcasesort($backgroundImages);
 foreach ($backgroundImages as $backgroundImage) {
     echo '<img src="' . PathUtility::getPublicPath($backgroundImage) . '" class="chroma-background-selector-image rotaryfocus" onclick="setChromaImage(this.src)">';
 }

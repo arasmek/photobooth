@@ -1,5 +1,5 @@
 /* globals photoBooth MarvinColorModelConverter AlphaBoundary MarvinImage Seriously initRemoteBuzzerFromDOM photoboothTools csrf */
-/* exported setChromaImage processChromaImage */
+/* exported setChromaImage processChromaImage chromaBackgrounds chromaLivePreview */
 let mainImage;
 let mainImageWidth;
 let mainImageHeight;
@@ -9,6 +9,13 @@ let target;
 let chroma;
 let seriouslyimage;
 let needsReload = false;
+// Filled in on the chroma capture page once the backgrounds are known.
+const chromaBackgrounds = {
+    count: 0,
+    next: () => {
+        return;
+    }
+};
 const notificationTimeout = config.ui.notification_timeout * 1000;
 
 const chromaCanvas = document.getElementById('chromaCanvas');
@@ -152,7 +159,6 @@ function processChromaImage(imgSrc, save = false, filename = '') {
     }
 }
 
-// eslint-disable-next-line no-unused-vars
 function setChromaImage(url) {
     backgroundImage = new Image();
     backgroundImage.src = url;
@@ -333,7 +339,19 @@ const chromaLivePreview = (function () {
         liveCanvas = document.createElement('canvas');
         liveCanvas.id = 'preview--chroma';
         liveContext = liveCanvas.getContext('2d');
-        video.after(liveCanvas);
+        // Fill the whole page. Placed outside #preview-container, whose
+        // transform would otherwise confine a fixed element to its box.
+        Object.assign(liveCanvas.style, {
+            display: 'none',
+            position: 'fixed',
+            top: '0',
+            left: '0',
+            width: '100vw',
+            height: '100dvh',
+            objectFit: 'cover'
+        });
+        const previewElement = video.closest('.preview') || video;
+        previewElement.before(liveCanvas);
 
         liveSeriously = new Seriously();
         const source = liveSeriously.source(video);
@@ -342,30 +360,6 @@ const chromaLivePreview = (function () {
         effect.source = source;
         liveTarget = liveSeriously.target(glCanvas);
         liveTarget.source = effect;
-    }
-
-    // Place the canvas where the video is rendered (same box, fit and rotation),
-    // but without the flip classes: only the person gets mirrored, not the background.
-    function syncLayout() {
-        const style = window.getComputedStyle(video);
-        [
-            'position',
-            'top',
-            'left',
-            'right',
-            'bottom',
-            'width',
-            'height',
-            'maxWidth',
-            'maxHeight',
-            'objectFit',
-            'rotate',
-            'translate',
-            'aspectRatio'
-        ].forEach((prop) => {
-            liveCanvas.style[prop] = style[prop];
-        });
-        liveCanvas.style.display = 'block';
     }
 
     function isActive() {
@@ -405,7 +399,10 @@ const chromaLivePreview = (function () {
             if (!running) {
                 running = true;
                 liveSeriously.go();
-                syncLayout();
+                // keep the preview rotation setting (flip is applied when drawing,
+                // so only the person gets mirrored, not the background)
+                liveCanvas.style.rotate = window.getComputedStyle(video).rotate;
+                liveCanvas.style.display = 'block';
                 // keep the video playing (it is the keying source and the
                 // capture source), but only show the keyed canvas
                 video.style.opacity = '0';
@@ -420,6 +417,24 @@ const chromaLivePreview = (function () {
         window.requestAnimationFrame(tick);
     }
 
+    api.isRunning = function () {
+        return running;
+    };
+
+    // Return a copy of the current keyed frame (background + person) at
+    // camera resolution, or null if the live preview is not running.
+    api.snapshot = function () {
+        if (!running || !isActive()) {
+            return null;
+        }
+        drawFrame();
+        const copy = document.createElement('canvas');
+        copy.width = liveCanvas.width;
+        copy.height = liveCanvas.height;
+        copy.getContext('2d').drawImage(liveCanvas, 0, 0);
+        return copy;
+    };
+
     api.init = function () {
         if (!api.isSupported()) {
             return;
@@ -431,11 +446,6 @@ const chromaLivePreview = (function () {
             return;
         }
         photoboothTools.console.logDev('Chroma live preview initialized.');
-        window.addEventListener('resize', () => {
-            if (running) {
-                syncLayout();
-            }
-        });
         window.requestAnimationFrame(tick);
     };
 
@@ -519,12 +529,41 @@ $(function () {
 
         initRemoteBuzzerFromDOM();
     } else {
-        $chromaActions.addClass('hidden');
+        const $backgrounds = $('.chroma-background-selector-image');
+        let backgroundIndex = -1;
 
-        $('.chroma-background-selector-image').on('click', function () {
+        const selectBackground = (index) => {
+            backgroundIndex = index;
+            setChromaImage($backgrounds.get(index).src);
+            $chromaMessage.addClass('hidden');
+            $chromaActions.removeClass('hidden');
+        };
+
+        $backgrounds.on('click', function () {
+            backgroundIndex = $backgrounds.index(this);
             $chromaMessage.addClass('hidden');
             $chromaActions.removeClass('hidden');
         });
+
+        // Backgrounds are cycled with a single key instead of being picked
+        // from thumbnails, so hide the selector and the "choose" message.
+        $('.chroma-background-selector').addClass('hidden');
+        $chromaMessage.addClass('hidden');
+
+        if ($backgrounds.length > 0) {
+            selectBackground(0);
+        } else {
+            $chromaActions.addClass('hidden');
+        }
+
+        // Next background: only goes forward and wraps around, so one button is
+        // enough. Called by the guest flow (chromaflow.js) on the function key.
+        chromaBackgrounds.count = $backgrounds.length;
+        chromaBackgrounds.next = () => {
+            if ($backgrounds.length > 0) {
+                selectBackground((backgroundIndex + 1) % $backgrounds.length);
+            }
+        };
 
         $('[data-command="take-chroma"]').on('click', (event) => {
             event.preventDefault();

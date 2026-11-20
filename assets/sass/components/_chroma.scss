@@ -24,6 +24,134 @@
   background: transparent;
 }
 
+// Two-button guest flow (chromaflow.js)
+.chroma-flow {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+
+  &.active {
+    display: block;
+  }
+}
+
+.chroma-flow-panel {
+  display: none;
+  position: absolute;
+  inset: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2rem;
+  padding: 2rem;
+  // fixed dark backdrop so text stays readable with any theme colors
+  background: #111;
+  color: #fff;
+  text-align: center;
+
+  &.active {
+    display: flex;
+  }
+}
+
+.chroma-flow-title {
+  font-size: 3rem;
+  font-weight: 700;
+}
+
+.chroma-flow-hint {
+  font-size: 1.5rem;
+  opacity: 0.8;
+}
+
+// photo shown briefly after each shot
+.chroma-flow-shot {
+  padding: 0;
+  background: #000;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  .chroma-flow-label {
+    position: absolute;
+    bottom: 2rem;
+    font-size: 2rem;
+    font-weight: 700;
+    color: #fff;
+    text-shadow: 0 0 8px #000;
+  }
+}
+
+.chroma-flow-photos {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2rem;
+  width: 100%;
+
+  img {
+    width: calc((100% - 4rem) / 3);
+    max-height: 55vh;
+    object-fit: contain;
+    border: 0.5rem solid transparent;
+    border-radius: 0.5rem;
+    opacity: 0.6;
+    cursor: pointer;
+    transition:
+      opacity 0.15s,
+      transform 0.15s,
+      border-color 0.15s;
+
+    &.selected {
+      opacity: 1;
+      border-color: var(--primary-color, #fff);
+      transform: scale(1.05);
+    }
+  }
+}
+
+.chroma-flow-numbers {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.chroma-flow-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 5.5rem;
+  height: 5.5rem;
+  border-radius: 50%;
+  border: 0.25rem solid var(--secondary-color, #888);
+  font-size: 2.5rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    transform 0.15s,
+    background-color 0.15s;
+
+  &.selected {
+    background: var(--primary-color, #fff);
+    border-color: var(--primary-color, #fff);
+    color: var(--button-font-color, #000);
+    transform: scale(1.2);
+  }
+}
+
+.chroma-flow-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: #fff;
+  pointer-events: none;
+}
+
 .chroma-background-selector {
   position: absolute;
   max-width: 100%;

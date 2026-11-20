@@ -10,6 +10,7 @@ use Photobooth\Processor\PrintProcessor;
 use Photobooth\Service\LoggerService;
 use Photobooth\Service\PrintManagerService;
 use Photobooth\Service\RemoteStorageService;
+use Photobooth\Utility\HotFolderUtility;
 use Photobooth\Utility\PathUtility;
 
 header('Content-Type: application/json');
@@ -231,50 +232,66 @@ if (!file_exists($vars['printFile'])) {
 
 // print image
 $status = 'ok';
+$hotFolder = trim((string) ($config['print']['hot_folder'] ?? ''));
 
-if ($config['print']['max_multi'] > 1) {
-    $cmd = sprintf(
-        $config['commands']['print'],
-        (int) $vars['copies'],
-        escapeshellarg($vars['printFile'])
-    );
-} else {
-    $cmd = sprintf(
-        $config['commands']['print'],
-        escapeshellarg($vars['printFile'])
-    );
-}
-$logger->info($cmd);
-$cmd .= ' 2>&1'; //Redirect stderr to stdout, otherwise error messages get lost.
-
-exec($cmd, $output, $returnValue);
-
-if ($returnValue !== 0) {
-    $status = 'error';
-
-    switch ($returnValue) {
-        case 1:
-            $error = 'General error. Check printer status or file path.';
-            break;
-        case 2:
-            $error = 'Misuse of command. Possibly wrong syntax or options.';
-            break;
-        case 126:
-            $error = 'Command invoked cannot execute. Check permissions.';
-            break;
-        case 127:
-            $error = "Command not found. Check if 'lp' is installed and in PATH.";
-            break;
-        case 238:
-            $status = 'queued';
-            $error = 'Image added to print queue.';
-            break;
-        default:
-            $error = "Unknown error (exit code $returnValue).";
+if ($hotFolder !== '') {
+    // Hot folder: the printer software prints every file that lands in the folder.
+    $cmd = 'copy to hot folder ' . $hotFolder;
+    $output = [];
+    $returnValue = 0;
+    try {
+        $output = HotFolderUtility::copyToHotFolder($vars['printFile'], $hotFolder, (int) $vars['copies'], $vars['uniqueName']);
+        $logger->info('Copied ' . count($output) . ' print(s) to hot folder ' . $hotFolder);
+    } catch (\Exception $e) {
+        $status = 'error';
+        $data['error'] = $e->getMessage();
+        $logger->error($e->getMessage());
     }
+} else {
+    if ($config['print']['max_multi'] > 1) {
+        $cmd = sprintf(
+            $config['commands']['print'],
+            (int) $vars['copies'],
+            escapeshellarg($vars['printFile'])
+        );
+    } else {
+        $cmd = sprintf(
+            $config['commands']['print'],
+            escapeshellarg($vars['printFile'])
+        );
+    }
+    $logger->info($cmd);
+    $cmd .= ' 2>&1'; //Redirect stderr to stdout, otherwise error messages get lost.
 
-    $logger->error($error);
-    $data['error'] = $error;
+    exec($cmd, $output, $returnValue);
+
+    if ($returnValue !== 0) {
+        $status = 'error';
+
+        switch ($returnValue) {
+            case 1:
+                $error = 'General error. Check printer status or file path.';
+                break;
+            case 2:
+                $error = 'Misuse of command. Possibly wrong syntax or options.';
+                break;
+            case 126:
+                $error = 'Command invoked cannot execute. Check permissions.';
+                break;
+            case 127:
+                $error = "Command not found. Check if 'lp' is installed and in PATH.";
+                break;
+            case 238:
+                $status = 'queued';
+                $error = 'Image added to print queue.';
+                break;
+            default:
+                $error = "Unknown error (exit code $returnValue).";
+        }
+
+        $logger->error($error);
+        $data['error'] = $error;
+    }
 }
 
 $outputMessage = implode("\n", (array) ($output));
