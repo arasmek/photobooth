@@ -108,8 +108,15 @@ const photoboothPreview = (function () {
             }
         };
 
-        getMedia
-            .call(navigator.mediaDevices, webcamConstraints)
+        api.findCameraId()
+            .then(function (deviceId) {
+                if (deviceId) {
+                    // a specific camera was chosen in the admin panel
+                    webcamConstraints.video.deviceId = { exact: deviceId };
+                    delete webcamConstraints.video.facingMode;
+                }
+                return getMedia.call(navigator.mediaDevices, webcamConstraints);
+            })
             .then(function (stream) {
                 photoboothTools.console.logDev('Preview: getMedia done!');
                 api.stream = stream;
@@ -132,6 +139,38 @@ const photoboothPreview = (function () {
                     );
                 }
             });
+    };
+
+    // Device id of the camera named in preview.camera_label, or null to use the
+    // browser's default camera (also when that camera is not connected).
+    api.findCameraId = async function () {
+        const wanted = (config.preview.camera_label || '').trim();
+        if (wanted === '' || !navigator.mediaDevices.enumerateDevices) {
+            return null;
+        }
+        const listCameras = async () =>
+            (await navigator.mediaDevices.enumerateDevices()).filter((device) => device.kind === 'videoinput');
+
+        let cameras = await listCameras();
+        if (cameras.length > 0 && cameras.every((device) => device.label === '')) {
+            // camera names are hidden until camera access was granted once
+            try {
+                const probe = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                probe.getTracks().forEach((track) => track.stop());
+                cameras = await listCameras();
+            } catch (error) {
+                photoboothTools.console.log('Preview: camera access needed to find "' + wanted + '":', error);
+                return null;
+            }
+        }
+
+        const match = cameras.find((device) => device.label === wanted);
+        if (!match) {
+            photoboothTools.console.log('Preview: camera "' + wanted + '" not connected, using the default camera.');
+            return null;
+        }
+        photoboothTools.console.logDev('Preview: using camera "' + wanted + '".');
+        return match.deviceId;
     };
 
     api.getAndDisplayMedia = function (mode) {

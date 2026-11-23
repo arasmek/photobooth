@@ -158,6 +158,14 @@ return [
             ],
             'value' => $config['ui']['language'],
         ],
+        'preview_camera_label' => [
+            'i18n' => 'preview:preview_camera_label',
+            'view' => 'basic',
+            'type' => 'input',
+            'name' => 'preview[camera_label]',
+            'placeholder' => '',
+            'value' => htmlentities($config['preview']['camera_label'] ?? ''),
+        ],
         'keying_shot_count' => [
             'i18n' => 'keying:keying_shot_count',
             'view' => 'basic',
