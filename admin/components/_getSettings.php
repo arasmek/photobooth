@@ -26,7 +26,7 @@ foreach ($configsetup as $section => $fields) {
 
     $col = 0;
     foreach ($fields as $key => $setting) {
-        if (in_array($key, ['platform', 'view'])) {
+        if (in_array($key, ['platform', 'view', 'i18n_section'])) {
             continue;
         }
 
@@ -35,7 +35,10 @@ foreach ($configsetup as $section => $fields) {
             $hidden = 'hidden';
         }
 
-        $i18ntag = $section . ':' . $key;
+        // Label / manual key. Settings moved to another section keep their
+        // original key ('i18n' per setting or 'i18n_section' per section),
+        // so existing translations still apply.
+        $i18ntag = $setting['i18n'] ?? (($fields['i18n_section'] ?? $section) . ':' . $key);
         echo '<!-- ' . strtoupper($setting['type']) . ' ' . strtoupper($setting['name']) . ' -->';
         echo '<div class="adminSettingCard relative flex flex-col rounded-xl p-3 shadow-xl bg-white ' . $hidden . '" id="' . $i18ntag . '">';
 

@@ -31,6 +31,9 @@ if (isset($sidebarHeadline)) {
             <a href="<?=PathUtility::getPublicPath('login')?>" class="h-4 mr-4 flex items-center justify-center border-r border-solid border-white/20 px-3">
                 <span class="fa fa-home text-white/60 text-2xl hover:text-white/100 transition-all"></span>
             </a>
+            <a href="<?=PathUtility::getPublicPath('gallery')?>" title="Gallery" class="h-4 mr-4 flex items-center justify-center border-r border-solid border-white/20 pr-3">
+                <span class="fa fa-images text-white/60 text-2xl hover:text-white/100 transition-all"></span>
+            </a>
             <div class="flex flex-col w-full">
               <h1 class="text-white font-bold"><?=$headline ?></h1>
               <h6 class="text-white text-xs"><?= $appVersion ?></h6>

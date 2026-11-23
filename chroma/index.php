@@ -39,9 +39,7 @@ include PathUtility::getAbsolutePath('template/components/main.head.php');
     <div class="stage-inner">
         <div class="stage-message stage-message--error"><?=$languageService->translate('chromaInfoBefore')?></div>
         <?php include PathUtility::getAbsolutePath('template/components/chroma.background.selector.php'); ?>
-        <div class="buttonbar buttonbar--top">
-            <?= ($config['gallery']['enabled']) ? ComponentUtility::renderButton('gallery', $config['icons']['gallery'], 'gallery-button') : '' ?>
-        </div>
+        <?php /* No gallery button for guests: the gallery is reached from the admin menu. */ ?>
         <div class="buttonbar buttonbar--bottom">
             <?= ComponentUtility::renderButton('takePhoto', $config['icons']['take_picture'], 'take-chroma') ?>
         </div>

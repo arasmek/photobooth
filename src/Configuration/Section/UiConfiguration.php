@@ -14,7 +14,7 @@ final class UiConfiguration
             ->ignoreExtraKeys()
             ->children()
                 ->enumNode('language')
-                    ->values(['cs', 'de', 'en', 'es', 'fr', 'hr', 'it', 'nl', 'pt', 'tr'])
+                    ->values(['cs', 'de', 'en', 'es', 'fr', 'hr', 'it', 'lt', 'nl', 'pt', 'tr'])
                     ->defaultValue('en')
                     ->end()
                 ->enumNode('local_timezone')

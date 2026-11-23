@@ -9,6 +9,10 @@ final class KeyingConfiguration
 {
     public static function getNode(): NodeDefinition
     {
+        // Admin form values arrive as strings, numeric nodes convert them.
+        $toFloat = fn (string $value): float => floatval($value);
+        $toInt = fn (string $value): int => intval($value);
+
         return (new TreeBuilder('keying'))->getRootNode()->addDefaultsIfNotSet()
             ->ignoreExtraKeys()
             ->children()
@@ -22,10 +26,18 @@ final class KeyingConfiguration
                     ->defaultValue('seriouslyjs')
                     ->end()
                 ->scalarNode('seriouslyjs_color')->defaultValue('#62af74')->end()
-                ->floatNode('seriouslyjs_weight')->min(0)->max(2)->defaultValue(1)->end()
-                ->floatNode('seriouslyjs_balance')->min(0)->max(1)->defaultValue(1)->end()
-                ->floatNode('seriouslyjs_clip_black')->min(0)->max(1)->defaultValue(0)->end()
-                ->floatNode('seriouslyjs_clip_white')->min(0)->max(1)->defaultValue(1)->end()
+                ->floatNode('seriouslyjs_weight')->min(0)->max(2)->defaultValue(1)
+                    ->beforeNormalization()->ifString()->then($toFloat)->end()
+                    ->end()
+                ->floatNode('seriouslyjs_balance')->min(0)->max(1)->defaultValue(1)
+                    ->beforeNormalization()->ifString()->then($toFloat)->end()
+                    ->end()
+                ->floatNode('seriouslyjs_clip_black')->min(0)->max(1)->defaultValue(0)
+                    ->beforeNormalization()->ifString()->then($toFloat)->end()
+                    ->end()
+                ->floatNode('seriouslyjs_clip_white')->min(0)->max(1)->defaultValue(1)
+                    ->beforeNormalization()->ifString()->then($toFloat)->end()
+                    ->end()
                 ->booleanNode('live_preview')->defaultValue(true)->end()
                 ->scalarNode('next_background_key')
                     ->info('key code that switches to the next background on the chroma capture page (39 = right arrow)')
@@ -35,9 +47,16 @@ final class KeyingConfiguration
                     ->info('key code that selects / confirms on the chroma capture page (37 = left arrow)')
                     ->defaultValue('37')
                     ->end()
-                ->integerNode('shot_count')->min(1)->max(6)->defaultValue(3)->end()
-                ->integerNode('shot_pause')->min(0)->max(10)->defaultValue(2)->end()
-                ->integerNode('max_copies')->min(1)->max(20)->defaultValue(10)->end()
+                // 1 = single photo, no photo choice
+                ->integerNode('shot_count')->min(1)->max(3)->defaultValue(3)
+                    ->beforeNormalization()->ifString()->then($toInt)->end()
+                    ->end()
+                ->integerNode('shot_pause')->min(0)->max(10)->defaultValue(2)
+                    ->beforeNormalization()->ifString()->then($toInt)->end()
+                    ->end()
+                ->integerNode('max_copies')->min(1)->max(20)->defaultValue(10)
+                    ->beforeNormalization()->ifString()->then($toInt)->end()
+                    ->end()
                 ->booleanNode('private_backgrounds')->defaultValue(false)->end()
                 ->booleanNode('show_all')->defaultValue(false)->end()
             ->end();

@@ -24,7 +24,85 @@
   background: transparent;
 }
 
-// Two-button guest flow (chromaflow.js)
+// Two-button guest flow (chromaflow.js). The page gets .chroma-flow-on when
+// the flow is active. Square shapes only, one gradient, one font.
+$booth-gap: 24px;
+$booth-keys-height: 88px;
+$booth-purple: #4b2a9e;
+
+body.chroma-flow-on {
+  background: linear-gradient(135deg, #1f45b5 0%, $booth-purple 100%) fixed;
+  color: #fff;
+  font-family:
+    'KTU Sans',
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+
+  // the static background canvas of the old chroma flow is not used
+  .chroma-canvas {
+    display: none;
+  }
+
+  // same box as the camera image, so the number is centered on the camera
+  .countdown {
+    color: #fff;
+    font-family: inherit;
+    font-weight: 400;
+    text-shadow: 0 2px 16px rgba(0, 0, 0, 0.35);
+  }
+
+  .countdown-number {
+    animation-name: chroma-flow-tick;
+  }
+}
+
+@keyframes chroma-flow-tick {
+  from {
+    opacity: 1;
+    font-size: 50vh;
+  }
+
+  to {
+    opacity: 0.1;
+    font-size: 0;
+  }
+}
+
+// Area for the camera image: everything above the key bar.
+$booth-area-width: calc(100vw - #{2 * $booth-gap});
+$booth-area-height: calc(100dvh - #{$booth-keys-height + 3 * $booth-gap});
+// drawn as an outline (outside the box), so the image fills the box exactly
+$booth-frame: 6px solid #fff;
+
+body.chroma-flow-on .countdown {
+  position: fixed;
+  top: $booth-gap;
+  left: $booth-gap;
+  width: $booth-area-width;
+  height: $booth-area-height;
+}
+
+// Live keyed camera image and the photo shown after each shot: the whole
+// frame stays visible (no cropping), centered in the area. The box has the
+// camera's aspect ratio (--chroma-camera-ratio, set by chromakeying.js), so
+// the frame sits exactly on the image.
+.chroma-live-canvas,
+.chroma-flow-shot img {
+  position: fixed;
+  top: calc(#{$booth-gap} + #{$booth-area-height} / 2);
+  left: 50%;
+  translate: -50% -50%;
+  width: min(#{$booth-area-width}, calc(#{$booth-area-height} * var(--chroma-camera-ratio, 1.7778)));
+  height: auto;
+  aspect-ratio: var(--chroma-camera-ratio, 1.7778);
+  object-fit: contain;
+  outline: $booth-frame;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+}
+
 .chroma-flow {
   display: none;
   position: fixed;
@@ -43,11 +121,9 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2rem;
-  padding: 2rem;
-  // fixed dark backdrop so text stays readable with any theme colors
-  background: #111;
-  color: #fff;
+  gap: $booth-gap;
+  padding: $booth-gap $booth-gap ($booth-keys-height + 2 * $booth-gap);
+  background: linear-gradient(135deg, #1f45b5 0%, $booth-purple 100%);
   text-align: center;
 
   &.active {
@@ -56,92 +132,155 @@
 }
 
 .chroma-flow-title {
-  font-size: 3rem;
-  font-weight: 700;
-}
-
-.chroma-flow-hint {
-  font-size: 1.5rem;
-  opacity: 0.8;
+  font-size: 48px;
 }
 
 // photo shown briefly after each shot
-.chroma-flow-shot {
-  padding: 0;
-  background: #000;
+.chroma-flow-shot .chroma-flow-label {
+  position: absolute;
+  bottom: $booth-keys-height + 2 * $booth-gap;
+  padding: 8px 16px;
+  background: rgba(0, 0, 0, 0.45);
+  font-size: 28px;
 
-  img {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-  }
-
-  .chroma-flow-label {
-    position: absolute;
-    bottom: 2rem;
-    font-size: 2rem;
-    font-weight: 700;
-    color: #fff;
-    text-shadow: 0 0 8px #000;
+  &:empty {
+    display: none;
   }
 }
 
 .chroma-flow-photos {
   display: flex;
-  flex-wrap: wrap;
   justify-content: center;
-  gap: 2rem;
+  gap: $booth-gap;
   width: 100%;
 
   img {
-    width: calc((100% - 4rem) / 3);
-    max-height: 55vh;
+    width: calc((100% - #{2 * $booth-gap}) / 3);
+    max-height: 60vh;
     object-fit: contain;
-    border: 0.5rem solid transparent;
-    border-radius: 0.5rem;
-    opacity: 0.6;
+    border: 6px solid transparent;
+    opacity: 0.55;
     cursor: pointer;
     transition:
-      opacity 0.15s,
-      transform 0.15s,
-      border-color 0.15s;
+      opacity 0.12s,
+      border-color 0.12s;
 
     &.selected {
       opacity: 1;
-      border-color: var(--primary-color, #fff);
-      transform: scale(1.05);
+      border-color: #fff;
     }
   }
 }
 
+// chosen photo above the copy selection; shrinks so the numbers always fit
+// Copy selection: photo as large as possible above the title and one row of
+// numbers. Tighter spacing than the other screens.
+$copies-gap: 16px;
+$copies-number: 72px;
+$copies-number-gap: 8px;
+$copies-title: 48px;
+
+.chroma-flow-copies {
+  gap: $copies-gap;
+
+  .chroma-flow-title {
+    font-size: 40px;
+    line-height: $copies-title;
+  }
+}
+
+// Height: whatever is left above the key bar after title, numbers and gaps
+// (outline included); width follows the photo, so the frame sits exactly on it.
+.chroma-flow-chosen {
+  flex: none;
+  height: min(
+    calc(
+      100dvh - #{2 * $booth-gap + $booth-keys-height + $booth-gap + $copies-title + $copies-number + 2 * $copies-gap +
+        12px}
+    ),
+    calc((100vw - #{2 * $booth-gap + 12px}) / var(--chroma-camera-ratio, 1.7778))
+  );
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+  outline: $booth-frame;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+}
+
+// one row: squares shrink to fit the width (--copies-count set by chromaflow.js)
 .chroma-flow-numbers {
   display: flex;
-  flex-wrap: wrap;
   justify-content: center;
-  gap: 1rem;
+  gap: $copies-number-gap;
+  --copies-size: min(
+    #{$copies-number},
+    calc((100vw - #{2 * $booth-gap} - (var(--copies-count, 11) - 1) * #{$copies-number-gap}) / var(--copies-count, 11))
+  );
 }
 
 .chroma-flow-number {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 5.5rem;
-  height: 5.5rem;
-  border-radius: 50%;
-  border: 0.25rem solid var(--secondary-color, #888);
-  font-size: 2.5rem;
-  font-weight: 700;
+  box-sizing: border-box;
+  width: var(--copies-size);
+  height: var(--copies-size);
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  font-size: calc(var(--copies-size) * 0.45);
   cursor: pointer;
   transition:
-    transform 0.15s,
-    background-color 0.15s;
+    background-color 0.12s,
+    color 0.12s;
 
   &.selected {
-    background: var(--primary-color, #fff);
-    border-color: var(--primary-color, #fff);
-    color: var(--button-font-color, #000);
-    transform: scale(1.2);
+    background: #fff;
+    border-color: #fff;
+    color: $booth-purple;
   }
+}
+
+// A / B physical button hints, shown on the screens where they do something
+.chroma-flow-keys {
+  display: none;
+  position: fixed;
+  left: $booth-gap;
+  right: $booth-gap;
+  bottom: $booth-gap;
+  z-index: 1100;
+  height: $booth-keys-height;
+  justify-content: center;
+  gap: $booth-gap;
+
+  &.active {
+    display: flex;
+  }
+}
+
+.chroma-flow-key {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  min-width: 320px;
+  height: 100%;
+  padding: 0 28px 0 0;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-radius: 0;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-family: inherit;
+  font-size: 30px;
+  cursor: pointer;
+}
+
+.chroma-flow-keycap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  aspect-ratio: 1;
+  background: #fff;
+  color: $booth-purple;
+  font-size: 44px;
 }
 
 .chroma-flow-flash {
@@ -150,6 +289,17 @@
   z-index: 2000;
   background: #fff;
   pointer-events: none;
+  animation: chroma-flow-flash 0.4s ease-out forwards;
+}
+
+@keyframes chroma-flow-flash {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
 }
 
 .chroma-background-selector {

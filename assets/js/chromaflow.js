@@ -39,7 +39,14 @@ const chromaFlow = (function () {
     let pickIndex = 0;
     let copies = 1;
     let savePromise = null;
-    let $root, $shot, $pick, $copies, $done;
+    let $root, $shot, $pick, $copies, $done, $keys;
+
+    // Labels of the two physical buttons per phase: A = select, B = function.
+    const keyLabels = {
+        [Phase.BACKGROUND]: ['chroma_flow_key_start', 'chroma_flow_key_next_background'],
+        [Phase.PICK]: ['chroma_flow_key_choose', 'chroma_flow_key_next_photo'],
+        [Phase.COPIES]: ['chroma_flow_key_confirm', 'chroma_flow_key_change']
+    };
 
     // translations are fetched asynchronously after page load
     const t = (key) => (photoboothTools.translations ? photoboothTools.getTranslation(key) : key);
@@ -54,27 +61,43 @@ const chromaFlow = (function () {
             '<div class="chroma-flow-panel chroma-flow-pick">' +
                 '<div class="chroma-flow-title"></div>' +
                 '<div class="chroma-flow-photos"></div>' +
-                '<div class="chroma-flow-hint"></div>' +
                 '</div>'
         ).appendTo($root);
         $copies = $(
             '<div class="chroma-flow-panel chroma-flow-copies">' +
+                '<img class="chroma-flow-chosen" alt="">' +
                 '<div class="chroma-flow-title"></div>' +
                 '<div class="chroma-flow-numbers"></div>' +
-                '<div class="chroma-flow-hint"></div>' +
                 '</div>'
         ).appendTo($root);
         $done = $(
             '<div class="chroma-flow-panel chroma-flow-done"><div class="chroma-flow-title"></div></div>'
         ).appendTo($root);
+
+        const key = (letter) =>
+            '<button type="button" class="chroma-flow-key" data-key="' +
+            letter.toLowerCase() +
+            '"><span class="chroma-flow-keycap">' +
+            letter +
+            '</span><span class="chroma-flow-keylabel"></span></button>';
+        $keys = $('<div class="chroma-flow-keys">' + key('A') + key('B') + '</div>').appendTo('body');
+        $keys.find('[data-key="a"]').on('click', () => onSelect());
+        $keys.find('[data-key="b"]').on('click', () => onFunction());
     }
 
     function applyTexts() {
         $pick.find('.chroma-flow-title').text(t('chroma_flow_pick'));
-        $pick.find('.chroma-flow-hint').text(t('chroma_flow_hint_pick'));
         $copies.find('.chroma-flow-title').text(t('chroma_flow_copies'));
-        $copies.find('.chroma-flow-hint').text(t('chroma_flow_hint_copies'));
         $done.find('.chroma-flow-title').text(t('chroma_flow_thanks'));
+    }
+
+    function updateKeys() {
+        const labels = keyLabels[phase];
+        $keys.toggleClass('active', Boolean(labels));
+        if (labels) {
+            $keys.find('[data-key="a"] .chroma-flow-keylabel').text(t(labels[0]));
+            $keys.find('[data-key="b"] .chroma-flow-keylabel').text(t(labels[1]));
+        }
     }
 
     function showPanel($panel) {
@@ -91,9 +114,9 @@ const chromaFlow = (function () {
     function setPhase(next) {
         phase = next;
         photoboothTools.console.logDev('Chroma flow phase: ' + phase);
-        // the start stage holds the Gallery / Picture buttons: only show them
-        // while choosing a background
-        $('.stage--chroma').toggleClass('stage--active', phase === Phase.BACKGROUND);
+        // the A/B key bar replaces the old start stage buttons
+        $('.stage--chroma').removeClass('stage--active');
+        updateKeys();
     }
 
     // ---- phase 2: shooting ------------------------------------------------
@@ -136,8 +159,9 @@ const chromaFlow = (function () {
         const element = document.createElement('div');
         element.classList.add('chroma-flow-flash');
         document.body.append(element);
-        element.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 400, easing: 'ease-out' }).onfinish = () =>
-            element.remove();
+        // the fade-out is a CSS animation; remove the element on a timer so it
+        // can never stay on screen, even if the animation is throttled
+        setTimeout(() => element.remove(), 450);
     }
 
     async function shoot() {
@@ -161,16 +185,24 @@ const chromaFlow = (function () {
             if (shotPauseMs() > 0) {
                 $shot.find('img').attr('src', shots[i]);
                 $shot.find('.chroma-flow-label').text(
-                    t('chroma_flow_shot')
-                        .replace('%1', i + 1)
-                        .replace('%2', total)
+                    total > 1
+                        ? t('chroma_flow_shot')
+                              .replace('%1', i + 1)
+                              .replace('%2', total)
+                        : ''
                 );
                 showPanel($shot);
                 await wait(shotPauseMs());
             }
         }
 
-        startPick();
+        if (total === 1) {
+            // single photo mode: nothing to choose
+            pickIndex = 0;
+            choosePhoto();
+        } else {
+            startPick();
+        }
     }
 
     // ---- phase 3: pick a photo --------------------------------------------
@@ -230,7 +262,10 @@ const chromaFlow = (function () {
     function startCopies() {
         setPhase(Phase.COPIES);
         copies = 1;
+        $copies.find('.chroma-flow-chosen').attr('src', shots[pickIndex]);
         const $numbers = $copies.find('.chroma-flow-numbers').empty();
+        // lets the stylesheet fit all numbers in one row
+        $numbers.get(0).style.setProperty('--copies-count', (maxCopies() + 1).toString());
         for (let n = 0; n <= maxCopies(); n++) {
             $('<div class="chroma-flow-number"></div>')
                 .text(n)
@@ -365,8 +400,17 @@ const chromaFlow = (function () {
             photoboothTools.console.log('Chroma flow disabled: live keyed preview is not available.');
             return;
         }
+        document.body.classList.add('chroma-flow-on');
         buildDom();
         setPhase(Phase.BACKGROUND);
+
+        // translations load asynchronously: relabel the keys once they are there
+        const relabel = setInterval(() => {
+            if (photoboothTools.translations) {
+                clearInterval(relabel);
+                updateKeys();
+            }
+        }, 100);
 
         $(document).on('keydown', (ev) => {
             if (ev.repeat) {

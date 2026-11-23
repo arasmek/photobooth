@@ -339,17 +339,11 @@ const chromaLivePreview = (function () {
         liveCanvas = document.createElement('canvas');
         liveCanvas.id = 'preview--chroma';
         liveContext = liveCanvas.getContext('2d');
-        // Fill the whole page. Placed outside #preview-container, whose
-        // transform would otherwise confine a fixed element to its box.
-        Object.assign(liveCanvas.style, {
-            display: 'none',
-            position: 'fixed',
-            top: '0',
-            left: '0',
-            width: '100vw',
-            height: '100dvh',
-            objectFit: 'cover'
-        });
+        // Layout (size, position, fit) comes from the .chroma-live-canvas styles.
+        // Placed outside #preview-container, whose transform would otherwise
+        // confine a fixed element to its box.
+        liveCanvas.classList.add('chroma-live-canvas');
+        liveCanvas.style.display = 'none';
         const previewElement = video.closest('.preview') || video;
         previewElement.before(liveCanvas);
 
@@ -382,6 +376,8 @@ const chromaLivePreview = (function () {
             liveCanvas.height = glCanvas.height = height;
             liveTarget.width = width;
             liveTarget.height = height;
+            // lets the stylesheet size the camera box (and its border) exactly
+            document.documentElement.style.setProperty('--chroma-camera-ratio', (width / height).toString());
         }
 
         liveContext.setTransform(1, 0, 0, 1, 0, 0);
